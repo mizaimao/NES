@@ -1,12 +1,15 @@
 #include <iostream>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SFML/Audio.hpp>
+#include <SFML/Graphics.hpp>
 
 using namespace std;
 
 
-const int WIDTH = 640;
+const int WIDTH = 1280;
 const int HEIGHT = 480;
+const int DEBUGGER_OFFSET = 640;
+
+const bool ENABLE_DEBUGGER = true;
 
 namespace VIEWER{
     class Viewer {
@@ -17,212 +20,190 @@ namespace VIEWER{
         public:
             int width = WIDTH;
             int height = HEIGHT;
-            uint8_t frame[WIDTH * HEIGHT * 4];
+            sf::Uint8* pixels = new sf::Uint8[WIDTH * HEIGHT * 4];
 
             Viewer(){
                 // array of pixels
                 //uint8_t pixels[this -> width * this -> height * 4];
-                memset(this -> frame, 0, sizeof this -> frame);
-                
-                for( int i = 200000; i < 900000; i++){
-                    frame[i] = 100;
+                // memset(this -> frame, 0, sizeof this -> frame);
+                for (int pi = 0; pi < WIDTH * HEIGHT * 4; pi += 4){
+                    pixels[pi] = 0;
+                    pixels[pi + 1] = 0;
+                    pixels[pi + 2] = 0;
+                    pixels[pi + 3] = 255;
                 }
-                cout << frame[0] << endl;
-                
             };
 
-            /**
-             * Put current frame into display.
-            */
-            int put_frame_a(SDL_Texture *p_texture){
-                for(int i = offset - offset_size * 2; i < offset + offset_size * 2; i++){
-                    this -> frame[i] = 0;
+            // Fill the pixel array with black RGB and 255 alpha.
+            void fill_black(){
+                for (int pi = 0; pi < WIDTH * HEIGHT * 4; pi += 4){
+                    pixels[pi] = 0;
+                    pixels[pi + 1] = 0;
+                    pixels[pi + 2] = 0;
+                    pixels[pi + 3] = 255;
                 }
-                for(int i = offset - offset_size; i < offset; i++){
-                    this -> frame[i] = 100;
-                }
-                // update texture with new data
-                int texture_pitch = 0;
-                void* p_texture_pixels = NULL;
-                if (SDL_LockTexture(p_texture, NULL, &p_texture_pixels, &texture_pitch) != 0) {
-                    SDL_Log("Unable to lock texture: %s", SDL_GetError());
-                }
-                else {
-                    memcpy(p_texture_pixels, this -> frame, texture_pitch * this -> height);
-                }
-                SDL_UnlockTexture(p_texture);
+            }
 
-                return 0;
-            };
+            void draw_pixel(int x, int y, int fill){
+                int location = y * WIDTH * 4 + x * 4;
+                pixels[location] = fill;
+                pixels[location + 1 ] = fill;
+                pixels[location + 2 ] = fill;
+            }
 
-            int put_frame_b(SDL_Texture *p_texture){
-                for(int i = offset - offset_size * 2; i < offset + offset_size * 2; i++){
-                    this -> frame[i] = 0;
-                }
-                for(int i = offset; i < offset + offset_size; i++){
-                    this -> frame[i] = 100;
-                }
-                // update texture with new data
-                int texture_pitch = 0;
-                void* p_texture_pixels = NULL;
-                if (SDL_LockTexture(p_texture, NULL, &p_texture_pixels, &texture_pitch) != 0) {
-                    SDL_Log("Unable to lock texture: %s", SDL_GetError());
-                }
-                else {
-                    memcpy(p_texture_pixels, this -> frame, texture_pitch * this -> height);
-                }
-                SDL_UnlockTexture(p_texture);
+            void draw_pixel(int x, int y, uint8_t color[3]){
+                int location = y * WIDTH * 4 + x * 4;
+                pixels[location] = color[0];
+                pixels[location + 1 ] = color[1];
+                pixels[location + 2 ] = color[2];
+            }
 
-                return 0;
-            };
-
-
-            /** 
-             * Entry point to create the viewer and handle input events.
-             **/
-            int start_viewer(){
-
-                SDL_Init(SDL_INIT_EVERYTHING);
-
-                // Create an SDL window.
-                SDL_Window *p_window = SDL_CreateWindow(
-                    "Chicken Window", 
-                    SDL_WINDOWPOS_UNDEFINED,
-                    SDL_WINDOWPOS_UNDEFINED, 
-                    this -> width, 
-                    this -> height,
-                    //SDL_WINDOW_RESIZABLE
-                    SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE
-                );
-                if (p_window == NULL){
-                    SDL_Log("Unable to create window: %s", SDL_GetError());
-                    return 1;      
-                }
-
-                // Create an SDL renderer.
-                SDL_Renderer *p_renderer = SDL_CreateRenderer(
-                    p_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-                );
-                if (p_renderer == NULL) {
-                    SDL_Log("Unable to create renderer: %s", SDL_GetError());
-                    return 1;
-                }
-                SDL_RenderSetLogicalSize(p_renderer, this -> width, this -> height);
-
-                // create texture
-                SDL_Texture *p_texture = SDL_CreateTexture(
-                    p_renderer,
-                    SDL_PIXELFORMAT_RGBA32,
-                    SDL_TEXTUREACCESS_STREAMING,
-                    this -> width,
-                    this -> height
-                );
-                if (p_texture == NULL) {
-                    SDL_Log("Unable to create texture: %s", SDL_GetError());
-                    return 1;
-                }
-            
-                // update texture with new data
-                int texture_pitch = 0;
-                void* p_texture_pixels = NULL;
-                if (SDL_LockTexture(p_texture, NULL, &p_texture_pixels, &texture_pitch) != 0) {
-                    SDL_Log("Unable to lock texture: %s", SDL_GetError());
-                }
-                else {
-                    memcpy(p_texture_pixels, this -> frame, texture_pitch * this -> height);
-                }
-                SDL_UnlockTexture(p_texture);
-
-                // main loop
-                bool should_quit = false;
-                SDL_Event e;
-                while (!should_quit) {
-
-                    // for (int i = 0; i < this -> width * this -> height * 4; i ++){
-                    //     pixels[i] = rand() % 255;
-                    // }
-                    // int texture_pitch = 0;
-                    // void* p_texture_pixels = NULL;
-                    // if (SDL_LockTexture(p_texture, NULL, &p_texture_pixels, &texture_pitch) != 0) {
-                    //     SDL_Log("Unable to lock texture: %s", SDL_GetError());
-                    // }
-                    // else {
-                    //     memcpy(p_texture_pixels, pixels, texture_pitch * this -> height);
-                    // }
-                    // SDL_UnlockTexture(p_texture);
-
-
-                    while (SDL_PollEvent(&e) != 0) {
-                        if (e.type == SDL_QUIT) {
-                            should_quit = true;
-                        } else if (e.type == SDL_KEYDOWN) {
-                            if (e.key.keysym.sym == SDLK_UP) {
-                            // Up Arrow
-                                this -> put_frame_a(p_texture);
-
-                            } else if (e.key.keysym.sym == SDLK_DOWN) {
-                            // Down Arrow
-                                this -> put_frame_b(p_texture);
-                            } else if (e.key.keysym.sym == SDLK_LEFT) {
-                            // Left Arrow
-                            } else if (e.key.keysym.sym == SDLK_RIGHT) {
-                            // Right Arrow
-
-                            //this opens a font style and sets a size
-                                TTF_Font* Sans = TTF_OpenFont("Sans.ttf", 24);
-
-                                // this is the color in rgb format,
-                                // maxing out all would give you the color white,
-                                // and it will be your text's color
-                                SDL_Color White = {255, 255, 255};
-
-                                // as TTF_RenderText_Solid could only be used on
-                                // SDL_Surface then you have to create the surface first
-                                SDL_Surface* surfaceMessage =
-                                    TTF_RenderText_Solid(Sans, "put your text here", White); 
-
-                                // now you can convert it into a texture
-                                SDL_Texture* Message = SDL_CreateTextureFromSurface(p_renderer, surfaceMessage);
-
-                                SDL_Rect Message_rect; //create a rect
-                                Message_rect.x = 0;  //controls the rect's x coordinate 
-                                Message_rect.y = 0; // controls the rect's y coordinate
-                                Message_rect.w = 100; // controls the width of the rect
-                                Message_rect.h = 100; // controls the height of the rect
-
-                                // (0,0) is on the top left of the window/screen,
-                                // think a rect as the text's box,
-                                // that way it would be very simple to understand
-
-                                // Now since it's a texture, you have to put RenderCopy
-                                // in your game loop area, the area where the whole code executes
-
-                                // you put the renderer's name first, the Message,
-                                // the crop size (you can ignore this if you don't want
-                                // to dabble with cropping), and the rect which is the size
-                                // and coordinate of your texture
-                                SDL_RenderCopy(p_renderer, Message, NULL, &Message_rect);
-
-                                // Don't forget to free your surface and texture
-                                SDL_FreeSurface(surfaceMessage);
-                                SDL_DestroyTexture(Message);
-                            }
-                        }
+            void draw_ract(int x_start, int x_end, int y_start, int y_end, int fill){
+                for ( int x = x_start; x < x_end; x ++){
+                    for (int y = y_start; y < y_end; y ++){
+                        draw_pixel(x, y, fill);
                     }
-
-                    // render on screen
-                    SDL_RenderClear(p_renderer);
-                    SDL_RenderCopy(p_renderer, p_texture, NULL, NULL);
-                    SDL_RenderPresent(p_renderer);
                 }
+            }
 
-                SDL_DestroyTexture(p_texture);
-                SDL_DestroyRenderer(p_renderer);
-                SDL_DestroyWindow(p_window);
-                SDL_Quit();
+            void draw_ract(int x_start, int x_end, int y_start, int y_end, uint8_t color[3]){
+                for ( int x = x_start; x < x_end; x ++){
+                    for (int y = y_start; y < y_end; y ++){
+                        draw_pixel(x, y, color);
+                    }
+                }
+            }
 
-                return 0;
-            };
+            void upper_block(){
+                fill_black();
+                draw_ract(300, 400, 100, 200, (uint8_t[3]){100, 200, 100});
+            }
+
+            void lower_block(){
+                fill_black();
+                draw_ract(300, 400, 300, 400, (uint8_t[3]){200, 100, 100});
+            }
+
+            void left_block(){
+                fill_black();
+                draw_ract(100, 200, 300, 400, (uint8_t[3]){100, 100, 200});
+            }
+
+            void right_block(){
+                fill_black();
+                draw_ract(500, 600, 300, 400, (uint8_t[3]){100, 200, 200});
+            }
+
+            int launch_window(){
+                // Create the main window
+                sf::RenderWindow window(
+                    sf::VideoMode(WIDTH, HEIGHT),
+                    "Chicken Window",
+                    // sf::Style::Default combines these three.
+                    sf::Style::Resize | sf::Style::Titlebar | sf::Style::Close
+                );
+
+                // Control FPS here.
+                window.setFramerateLimit(60);
+            
+                // Load a sprite to display
+                sf::Texture texture;
+                // if (!texture.loadFromFile("cute_image.jpg"))
+                //     return EXIT_FAILURE;
+                // sf::Sprite sprite(texture);
+            
+                // Create a graphical text to display
+                sf::Font font;
+                if (!font.loadFromFile("PerfectDOSVGA437.ttf"))
+                    return EXIT_FAILURE;
+                sf::Text text("Chicken text message", font, 50);
+            
+                // Load a music to play
+                // sf::Music music;
+                // if (!music.openFromFile("nice_music.ogg"))
+                //     return EXIT_FAILURE;
+            
+                // Play the music
+                // music.play();
+
+                cout <<"CHICKEN"<<endl;
+
+                // Process events
+                sf::Event event;
+                sf::Texture frame_texture;
+                frame_texture.create(WIDTH, HEIGHT);
+                frame_texture.update(pixels);
+                sf::Sprite sprite;
+                sprite.setTexture(frame_texture);
+            
+                // Start the game loop
+                while (window.isOpen())
+                {
+                    while (window.pollEvent(event))
+                    {
+
+                        // Close window: exit
+                        switch (event.type) {
+                            case sf::Event::Closed:
+                                window.close();
+                                break;
+
+                            case sf::Event::KeyPressed:
+                                switch (event.key.code){
+                                    case sf::Keyboard::N:
+                                        cout << "N is pressed" << endl;
+                                        break;
+                                    case sf::Keyboard::D:
+                                        window.close();
+                                        break;
+                                    case sf::Keyboard::Up:
+                                        upper_block();
+                                        frame_texture.update(pixels);
+                                        sprite.setTexture(frame_texture);
+                                        break;
+                                    case sf::Keyboard::Down:
+                                        lower_block();
+                                        frame_texture.update(pixels);
+                                        sprite.setTexture(frame_texture);
+                                        break;
+
+                                    case sf::Keyboard::Left:
+                                        left_block();
+                                        frame_texture.update(pixels);
+                                        sprite.setTexture(frame_texture);
+                                        break;
+
+                                    case sf::Keyboard::Right:
+                                        right_block();
+                                        frame_texture.update(pixels);
+                                        sprite.setTexture(frame_texture);
+                                        break;
+
+                                    default:
+                                        break;
+
+                                }
+                                break;
+
+                            default:
+                                break;
+                        }
+            
+                        // Clear screen
+                        window.clear();
+                
+                        // Draw the sprite
+                        window.draw(sprite);
+                
+                        // Draw the string
+                        window.draw(text);
+                
+                        // Update the window
+                        window.display();
+                }
+            }
+            return 0;
+        }
+
     };
-
-}
+};
