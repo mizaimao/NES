@@ -1,11 +1,15 @@
-#include <iostream>
-
 #include "viewer.cpp"
+#include "bus6502.h"
+// #include "cpu.h"
  
 int main()
 {
-    VIEWER::Viewer Viewer;
+    Viewer Viewer;
     Viewer.launch_window();
+    std::cout<< "Viewer Launched" <<std::endl;
+    
+    Bus bus;
+    //SY6502 cpu;
  
     return 0;
 }
