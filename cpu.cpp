@@ -1,5 +1,6 @@
 // Credits to https://www.youtube.com/watch?v=8XmxKPJDGU0
 //#pragma once
+#include "bus6502.h"
 #include "cpu.h"
 #include <vector>
 #include <iostream>
@@ -34,11 +35,11 @@ SY6502::~SY6502(){
 }
             
 void SY6502::write(uint16_t addr, uint8_t data){
-    bus -> write(addr, data);
+    bus -> cpu_write(addr, data);
 };
 
 uint8_t SY6502::read(uint16_t addr, bool read_only = false){
-    return bus -> read(addr, read_only);
+    return bus -> cpu_read(addr, read_only);
 };
 
 // Disassembler function.
@@ -63,7 +64,7 @@ std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end){
     while (addr <= (uint32_t)end){
 
         break;
-        
+
         line_addr = addr;
         // Generate instruction string.
         std::string instruction = "$" + hex(addr, 4) + ": ";
