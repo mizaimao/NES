@@ -7,6 +7,9 @@
 class PPU2C02{
 
     public:
+        PPU2C02();
+        ~PPU2C02();
+
         // IO with main bus.
         void cpu_write(uint16_t addr, uint8_t data);
         uint8_t cpu_read(uint16_t addr, bool read_only = false);

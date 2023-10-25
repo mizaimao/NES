@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 #include <array>
 #include <memory>
 #include "cpu.h"
@@ -9,8 +9,8 @@ class Bus{
     // Devices connected to the Bus.
     public:
         // Structors mustn't present here.
-        // Bus();
-        // ~Bus();
+        Bus();
+        ~Bus();
 
         SY6502 cpu;
         std::array<uint8_t, 2048> cpu_ram;
@@ -31,7 +31,7 @@ class Bus{
     public:
         // Only cpu get to RW on/to bus.
         void cpu_write(uint16_t addr, uint8_t data);
-        uint8_t cpu_read(uint16_t addr, bool read_only = false);
+        uint8_t cpu_read(uint16_t addr, bool read_only);
 
     public:
         // NES operations.
