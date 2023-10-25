@@ -2,6 +2,7 @@
 //#pragma once
 #include "cpu.h"
 #include <vector>
+#include <iostream>
 
 
 SY6502::SY6502(){

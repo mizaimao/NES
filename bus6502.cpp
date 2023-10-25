@@ -1,12 +1,12 @@
 #include <array>
-#include "bus.h"
+#include "bus6502.h"
 
 Bus::Bus(){
-        // // Init ram values.
-        // std::cout << "Bus constructed" << std::endl;
-        // for (auto &i : ram) i = 0x00;
-        // // Connect the cpu to this bus.
-        // cpu.connect_bus(this);
+        // Init ram values.
+        std::cout << "Bus constructed" << std::endl;
+        for (auto &i : ram) i = 0x00;
+        // Connect the cpu to this bus.
+        cpu.connect_bus(this);
     };
 
 Bus::~Bus(){
