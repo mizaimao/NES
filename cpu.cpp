@@ -41,6 +41,43 @@ uint8_t SY6502::read(uint16_t addr, bool read_only = false){
     return bus -> read(addr, read_only);
 };
 
+// Disassembler function.
+std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end){
+    uint32_t addr = start;
+    uint8_t value = 0x00;
+    uint8_t low = 0x00;
+    uint8_t high = 0x00;
+
+    std::map<uint16_t, std::string> mapped_lines;
+    uint16_t line_addr = 0x0000;
+
+    // Utility stolen from the video to convert variable into hex string.
+    auto hex = [](uint32_t n, uint8_t d)
+	{
+		std::string s(d, '0');
+		for (int i = d - 1; i >= 0; i--, n >>= 4)
+			s[i] = "0123456789ABCDEF"[n & 0xF];
+		return s;
+	};
+
+    while (addr <= (uint32_t)end){
+
+        break;
+        
+        line_addr = addr;
+        // Generate instruction string.
+        std::string instruction = "$" + hex(addr, 4) + ": ";
+        
+        // Get opcode and its name.
+        //uint8_t opcode = 
+
+    }
+
+
+
+    return mapped_lines;
+}
+
 void SY6502::clock(){
     if (cycles == 0){
         // Read program counter and get one byte.
@@ -66,6 +103,70 @@ uint8_t SY6502::fetch(){
     if (instruction_table[opcode].addrmode != &SY6502::IMP)
         fetched = read(addr_abs);
     return addr_abs;
+}
+
+void SY6502::reset(){
+    // Reset registers.
+    a = 0;
+    x = 0;
+    y = 0;
+    stkp = 0xFD;
+    status = 0x00 | get_flag(U);
+    // Reset addresses and PC.
+    addr_abs = 0xFFFC;  // Initial address defined by 6502.
+    uint16_t low = read(addr_abs + 0);
+    uint16_t high = read(addr_abs + 1);
+    pc = (high << 8) | low;
+    // Reset helper variables.
+    addr_rel = 0x0000;
+    addr_abs = 0x0000;
+    fetched = 0x00;
+
+    cycles = 8;
+}
+
+void SY6502::irq(){
+    if ( get_flag(I) == 0 ){  // Executes only if interrupt-allowing flag.
+        write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+        stkp--;
+        write(0x0100 + stkp, pc & 0x00FF);
+        stkp--;
+
+        set_flag(B, 0);  // Break flag.
+        set_flag(U, 1);  // Not used, not sure why it's in the video.
+        set_flag(I, 1);  // Irq disabled when set to 1.
+        write(0x0100 + stkp, status);
+        stkp--;
+
+        // Hardcoded address to get next PC when interrupt occurs.
+        addr_abs = 0xFFFE;
+        uint16_t low = read(addr_abs + 0);
+        uint16_t high = read(addr_abs + 1);
+        pc = (high << 8) | low;
+
+        cycles = 7;
+    }
+}
+
+void SY6502::nmi(){
+    write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+    stkp--;
+    write(0x0100 + stkp, pc & 0x00FF);
+    stkp--;
+
+    set_flag(B, 0);  // Break flag.
+    set_flag(U, 1);  // Not used, not sure why it's in the video.
+    set_flag(I, 1);  // Irq disabled when set to 1.
+    write(0x0100 + stkp, status);
+    stkp--;
+
+    // Hardcoded address to get next PC when interrupt occurs.
+    addr_abs = 0xFFFA;  // Note this is different from irq.
+    uint16_t low = read(addr_abs + 0);
+    uint16_t high = read(addr_abs + 1);
+    pc = (high << 8) | low;
+
+    cycles = 8;
 }
 
 // 12 Addressing modes.
@@ -194,4 +295,563 @@ uint8_t SY6502::AND(){
     a = a & fetched;
     set_flag(Z, a == 0x00);
     set_flag(N, a & 0x00);
+
+    return 1;
+}
+// Branch operations.
+// Branch if carry bit is set. Can potentially require two additional cycles.
+uint8_t SY6502::BCS(){
+    if (get_flag(C) == 1){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Brach on carry clear.
+uint8_t SY6502::BCC(){
+    if (get_flag(C) == 0){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on result zero.
+uint8_t SY6502::BEQ(){
+    if (get_flag(Z) == 1){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on result minus.
+uint8_t SY6502::BMI(){
+    if (get_flag(N) == 1){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on result not equal to zero.
+uint8_t SY6502::BNE(){
+    if (get_flag(Z) == 0){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on result plus (positive).
+uint8_t SY6502::BPL(){
+    if (get_flag(N) == 0){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on overflow.
+uint8_t SY6502::BVS(){
+    if (get_flag(V) == 1){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+// Branch on overflow clear.
+uint8_t SY6502::BVC(){
+    if (get_flag(V) == 0){
+        cycles++;  // Additional cycle needed if branches.
+        addr_abs = pc + addr_rel;
+
+        if ((addr_abs & 0xFF00) != (pc & 0xFF00)){
+            cycles ++;  // Additional cycle if page is crossed.
+        }
+        pc = addr_abs;
+    }
+    return 0;
+}
+
+// Clear operations.
+// Clear the carry flag.
+uint8_t SY6502::CLC(){
+    set_flag(C, false);
+    return 0;
+}
+// Clear decimal mode.
+uint8_t SY6502::CLD(){
+    set_flag(D, false);
+    return 0;
+}
+// Clear interrupt disable bit.
+uint8_t SY6502::CLI(){
+    set_flag(I, false);
+    return 0;
+}
+// Clear overflow flag.
+uint8_t SY6502::CLV(){
+    set_flag(V, false);
+    return 0;
+}
+
+// Addition. Add memory to accumulator with carry.
+// Complexity arises when dealing with signed integers.
+/**
+ * Need to check two flags: negative and overflow.
+ * Several scenarios when adding positive and negative numbers (signed):
+ *     1. P + P may overflow;
+ *     2. N + N may overflow;
+ *     3. P + N will never overflow.
+ * Therefore, the "V" register in flag register also helps when two signed
+ * numbers are added.
+ *  A truth table can help (0, 1 are the most significant bit of that
+ *  number):
+ *          A   M   R   V     A^R ~A^M    &
+ *          0   0   0   0      0    1     0
+ *          0   0   1   1      1    1     1
+ *          0   1   0   0      0    0     0
+ *          0   1   1   1      1    0     0
+ *          1   0   0   0      1    0     0
+ *          1   0   1   1      0    0     0
+ *          1   1   0   0      1    1     1
+ *          1   1   1   1      0    1     0 *
+ *  where A is the number in accumulator, M is fetched number, and R is the
+ *  result. V is the overflow flag, and A^R is exclusive-or.
+ *  We can there are only two situations where overflow should be set, which
+ *  can be calculated by using binary "and" between XOR(A, R) and ~XOR(A, M)
+*/ 
+uint8_t SY6502::ADC(){
+    fetch();
+    // Cast 8-bit values into 16-bit spaces.
+    uint16_t temp = (uint16_t)a + (uint16_t)fetched + (uint16_t)get_flag(C);
+    // Overflow can easily be checked in 16-bit space.
+    set_flag(C, temp > 255);
+    // Set zero flag if lower byte is zero.
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    // Negative flag is set by checking the most significant bit (7th bit).
+    set_flag(N, temp & 0x80);
+    // Overflow flag. Calculated by above table.
+    set_flag(
+        V,
+        (~((uint16_t)a ^ (uint16_t)fetched) & ((uint16_t)a ^ (uint16_t)temp)) & 0x0080
+    );
+    // Save to accumulator and according to 6502 manual this requires an additional cycle.
+    a = temp & 0x00FF;
+    return 1;
+}
+
+// Subtraction. Subtract memory from accumulator with carry.
+/**
+ * Subtraction function. It updates accumulator with the result of
+ * accumulator - fetched - (1 - carry); where the last item is the
+ * opposite of carry bit, because in this case it's a "borrow" bit.
+ *
+ * It is wise for hardware designers to reuse existing implementation, and
+ * in this case, we can convert this subtraction operation into addition.
+ * We don't know if 6502 uses its addition module to perform subtraction.
+ *
+ * A = A - M - (1 - C) becomes A + (-1) * (M - (1 - C))
+ * then, A = A + (- M) + 1 + C
+ * and when flipping the sign of a signed number, we invert each bit and
+ * plus one. E.g.
+ * 5 = 0b00000101 and -5 = 0b11111010 + 0b00000001
+ * Note that plus one operation can be included in the above deduced
+ * formula, so for this subtraction operation, all we need to do is to
+ * invert the number and use the addition function (ADC) codes.
+ * This implementation reuses most part of addition function except one inversion operation.
+*/
+uint8_t SY6502::SBC(){
+    fetch();
+    uint16_t value = ((uint16_t)fetched) ^ 0x00FF;  // Inverts the lower byte using xor.
+    uint16_t temp = (uint16_t)a + value + (uint16_t)get_flag(C);
+
+    set_flag(C, temp > 255);  // Or temp & 0xFF00.
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    set_flag(N, temp & 0x80);
+    set_flag(
+        V,
+        (((uint16_t)a ^ temp) & (value ^ temp)) & 0x0080
+    );
+    a = temp & 0x00FF;
+    return 1;
+}
+
+// Push accumulator on stack.
+uint8_t SY6502::PHA(){
+    write(0x0100 + stkp, a);
+    stkp--;
+    return 0;
+}
+// Get stack value and push to accumulator.
+uint8_t SY6502::PLA(){
+    stkp++;
+    a = read(0x0100 + stkp);
+    set_flag(Z, a == 0x00);
+    set_flag(N, a & 0x80);
+    return 0;
+}
+
+// Return from interrupt.
+uint8_t SY6502::RTI(){
+    stkp++;
+    status = read(0x0100 + stkp);
+    status &= ~B;
+    status &= ~U;
+
+    stkp++;
+    pc = (uint16_t)read(0x0100 + stkp);
+    stkp++;
+    pc |= (uint16_t)read(0x0100 + stkp) << 8;
+    return 0;
+}
+
+// Uncovered operations in the video.
+// Arithmetic shift left.
+uint8_t SY6502::ASL(){
+    fetch();
+    auto temp = (uint16_t)fetched << 1;
+    set_flag(C, (temp & 0xFF00) > 0);
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    set_flag(N, temp & 0x80);
+
+    if (instruction_table[opcode].addrmode == &SY6502::IMP)
+        a = temp & 0x00FF;
+    else
+        write(addr_abs, temp & 0x00FF);
+    return 0;
+}
+// Test bit in memory with accumulator.
+uint8_t SY6502::BIT(){
+    fetch();
+    auto temp = a & fetched;
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    set_flag(N, fetched & (1 << 7));
+    set_flag(V, fetched & (1 << 6));
+    return 0;
+}
+// Force break.
+uint8_t SY6502::BRK(){
+    pc++;
+
+    set_flag(I, 1);
+    write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+    stkp--;
+    write(0x0100 + stkp, pc & 0x00FF);
+    stkp--;
+
+    set_flag(B, 1);
+    write(0x0100 + stkp, status);
+    stkp--;
+    set_flag(B, 0);
+
+    pc = (uint16_t)read(0xFFFE) | ((uint16_t)read(0xFFFF) << 8);
+    return 0;
+}
+// Compare memory and accumulator.
+uint8_t SY6502::CMP(){
+    fetch();
+    auto temp = (uint16_t)a - (uint16_t)fetched;
+    set_flag(C, a >= fetched);
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0080);
+    return 1;
+    
+}
+// Compare memory and index X.
+uint8_t SY6502::CPX(){
+    fetch();
+    auto temp = (uint16_t)x - (uint16_t)fetched;
+    set_flag(C, x >= fetched);
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0080);
+    return 0;
+}
+uint8_t SY6502::CPY(){
+    fetch();
+    auto temp = (uint16_t)y - (uint16_t)fetched;
+    set_flag(C, y >= fetched);
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0080);
+    return 0;
+}
+// Decrement value in memory by one.
+uint8_t SY6502::DEC(){
+    fetch();
+    auto temp = fetched - 1;
+    write(addr_abs, temp & 0x00FF);
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0000);
+    return 0;
+}
+// Decrement index X by one.
+uint8_t SY6502::DEX(){
+    x--;
+    set_flag(Z , x == 0x00);
+    set_flag(N, x & 0x80);
+    return 0;
+}
+uint8_t SY6502::DEY(){
+    y--;
+    set_flag(Z, y == 0x00);
+    set_flag(N, y & 0x80);
+    return 0;
+}
+// XOR memory with accumulator.
+uint8_t SY6502::EOR(){
+    fetch();
+    a = a ^ fetched;
+    set_flag(Z, a = 0x00);
+    set_flag(N, a & 0x80);
+    return 1;
+}
+// Increment memory/X/Y by one.
+uint8_t SY6502::INC(){
+    fetch();
+    auto temp = fetched + 1;
+    write(addr_abs, temp & 0x00FF);
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0080);
+    return 0;
+}
+uint8_t SY6502::INX(){
+    x++;
+    set_flag(Z , x == 0x00);
+    set_flag(N, x & 0x80);
+    return 0;
+}
+uint8_t SY6502::INY(){
+    y++;
+    set_flag(Z, y == 0x00);
+    set_flag(N, y & 0x80);
+    return 0;
+}
+
+// Jump to location.
+uint8_t SY6502::JMP(){
+    pc = addr_abs;
+    return 0;
+}
+// Jump to sub-routine but also save location.
+uint8_t SY6502::JSR(){
+    pc--;
+
+    write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+    stkp--;
+    write(0x0100 + stkp, pc & 0x00FF);
+    stkp--;
+
+    pc = addr_abs;
+    return 0;
+}
+// Load accumulator with memory.
+uint8_t SY6502::LDA(){
+    fetch();
+    a = fetched;
+    set_flag(Z, a == 0x00);
+    set_flag(N, a & 0x80);
+    return 1;
+}
+uint8_t SY6502::LDX(){
+    fetch();
+    x = fetched;
+    set_flag(Z, x == 0x00);
+    set_flag(N, x & 0x80);
+    return 1;
+}
+uint8_t SY6502::LDY(){
+    fetch();
+    y = fetched;
+    set_flag(Z, y == 0x00);
+    set_flag(N, y & 0x80);
+    return 1;
+}
+
+// Shift one bit right.
+uint8_t SY6502::LSR(){
+    fetch();
+    set_flag(C, fetched & 0x0001);
+    auto temp = fetched >> 1;
+    set_flag(Z, (temp & 0x00FF) == 0x0000);
+    set_flag(N, temp & 0x0080);
+
+    if (instruction_table[opcode].addrmode == &SY6502::IMP)
+        a = temp & 0x00FF;
+    else
+        write(addr_abs, temp & 0x00FF);
+
+    return 0;
+}
+// No operation.
+uint8_t SY6502::NOP(){
+    switch (opcode){
+        case 0x1C:
+        case 0x3C:
+        case 0x5C:
+        case 0x7C:
+        case 0xDC:
+        case 0xFC:
+            return 1;
+            break;
+    }
+    return 0;
+}
+// "OR" memory with accumulator.
+uint8_t SY6502::ORA(){
+    fetch();
+    a = a | fetched;
+    set_flag(Z, a = 0x00);
+    set_flag(N, a & 0x80);
+    return 1;
+}
+// Push status register to stack.
+uint8_t SY6502::PHP(){
+    write(0x0100 + stkp, status | B | U);
+    set_flag(B, 0);
+    set_flag(U, 0);
+    stkp--;
+    return 0;
+}
+// Pop status register to accumulator.
+uint8_t SY6502::PLP(){
+    stkp++;
+    status = read(0x0100 + stkp);
+    set_flag(U, 1);
+    return 0;
+}
+// Rotate one bit left/right.
+uint8_t SY6502::ROL(){
+    fetch();
+    auto temp = (uint16_t)(fetched << 1) | get_flag(C);
+    set_flag(C, fetched & 0x01);
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    set_flag(N, temp & 0x0080);
+    if (instruction_table[opcode].addrmode == &SY6502::IMP)
+        a = temp & 0x00FF;
+    else
+        write(addr_abs, temp & 0x00FF);
+    return 0;
+}
+uint8_t SY6502::ROR(){
+    fetch();
+    auto temp = (uint16_t)(get_flag(C) << 7) | (fetched >> 1);
+    set_flag(C, fetched & 0x01);
+    set_flag(Z, (temp & 0x00FF) == 0x00);
+    set_flag(N, temp & 0x0080);
+    if (instruction_table[opcode].addrmode == &SY6502::IMP)
+        a = temp & 0x00FF;
+    else
+        write(addr_abs, temp & 0x00FF);
+    return 0;
+}
+
+// Return from subroutine.
+uint8_t SY6502::RTS(){
+    stkp++;
+    pc = (uint16_t)read(0x0100 + stkp);
+    stkp++;
+    pc |= (uint16_t)read(0x0100 + stkp) << 8;
+    pc++;
+    return 0;
+}
+// Set flags.
+uint8_t SY6502::SEC(){
+    set_flag(C, true);
+    return 0;
+}
+uint8_t SY6502::SED(){
+    set_flag(D, true);
+    return 0;
+}
+uint8_t SY6502::SEI(){
+    set_flag(I, true);
+    return 0;
+}
+// Store Accumulator/X/Y to address.
+uint8_t SY6502::STA(){
+    write(addr_abs, a);
+    return 0;
+}
+uint8_t SY6502::STX(){
+    write(addr_abs, x);
+    return 0;
+}
+uint8_t SY6502::STY(){
+    write(addr_abs, y);
+    return 0;
+}
+// Transfer accumulator to X/Y register.
+uint8_t SY6502::TAX(){
+    x = a;
+    set_flag(Z, x == 0x00);
+    set_flag(N, x & 0x80);
+    return 0;
+}
+uint8_t SY6502::TAY(){
+    y = a;
+    set_flag(Z, y == 0x00);
+    set_flag(N, y & 0x80);
+    return 0;
+}
+// Transfer stack pointer to X register.
+uint8_t SY6502::TSX(){
+    x = stkp;
+    set_flag(Z, x == 0x00);
+    set_flag(N, x & 0x80);
+    return 0;
+}
+// Transfer X to accumulator.
+uint8_t SY6502::TXA(){
+    a = x;
+    set_flag(Z, a = 0x00);
+    set_flag(N, a & 0x80);
+    return 0;
+}
+// Transfer X to stack resister.
+uint8_t SY6502::TXS(){
+    stkp = x;
+    return 0;
+}
+// Transfer Y to accumulator.
+uint8_t SY6502::TYA(){
+    a = y;
+    set_flag(Z, a = 0x00);
+    set_flag(N, a & 0x80);
+    return 0;
+}
+
+// Illegal opcode placeholder.
+uint8_t SY6502::XXX(){
+    return 0;
 }
