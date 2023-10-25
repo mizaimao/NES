@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include<iostream>
+#include <memory>
 #include "nes_cartridge.h"
 
 class PPU2C02{

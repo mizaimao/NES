@@ -1,5 +1,6 @@
 //#pragma once
 #include <array>
+#include <memory>
 #include "cpu.h"
 #include "ppu.h"
 #include "nes_cartridge.h"
