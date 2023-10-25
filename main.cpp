@@ -6,8 +6,8 @@ using namespace::std;
 int main()
 {
     Bus bus;
-    cout << "super chicken current cpu cycle: " << bus.cpu.cycles << endl;
-    bus.cpu.reset();
+    cout << "super chicken current x register: " << bus.cpu.x << endl;
+    bus.cpu.clock();
 
     int char_per_line = 16;
     for (int i = 0x0000; i < 0x00FF; i+=char_per_line){

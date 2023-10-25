@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <string>
 #include <map>
@@ -7,8 +8,8 @@ class Bus;
 class SY6502{
     public:
         // Structors mustn't present here.
-        // SY6502();
-        // ~SY6502();
+        SY6502();
+        ~SY6502();
         void connect_bus(Bus *n){
             bus = n;
         }
@@ -47,6 +48,16 @@ class SY6502{
         void irq();  // Interrupt request. May get ignored by flag I.
         void nmi();  // Non-maskable interrupt request. Cannot be ignored.
 
+    private:
+        Bus *bus = nullptr;
+
+        // IO of bus.
+        uint8_t read(uint16_t addr, bool read_only);
+	    void    write(uint16_t addr, uint8_t data);
+        // Access status register.
+        uint8_t get_flag(FLAGS6502 f);
+        void set_flag(FLAGS6502 f, bool v);
+
         // Helper functions/variables.
         uint8_t fetch();
         uint8_t fetched;  // Stores result of above fetch().
@@ -57,7 +68,6 @@ class SY6502{
 
         // Disassembler.
         std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end);
-
 
         // For each of the operation, we emulate addressing mode
         // and operation.
@@ -84,17 +94,5 @@ class SY6502{
 
         // Illegal operations are caught here.
         uint8_t XXX();
-
-    private:
-        Bus *bus = nullptr;
-
-        // IO of bus.
-        uint8_t read(uint16_t addr, bool read_only);
-	    void    write(uint16_t addr, uint8_t data);
-        // Access status register.
-        uint8_t get_flag(FLAGS6502 f);
-        void set_flag(FLAGS6502 f, bool v);
-
-
 };
     
