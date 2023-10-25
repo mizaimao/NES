@@ -55,6 +55,9 @@ class SY6502{
         uint8_t opcode = 0x00;  // Current opcode.
         uint8_t cycles = 0;  // Remaining cycles of current operation.
 
+        // Disassembler.
+        std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end);
+
 
         // For each of the operation, we emulate addressing mode
         // and operation.
