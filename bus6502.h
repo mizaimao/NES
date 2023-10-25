@@ -1,12 +1,13 @@
 //#pragma once
 #include "cpu.h"
+#include <array>
 
 class Bus{
     // Devices connected to the Bus.
     public:
-        // Structors.
-        Bus();
-        ~Bus();
+        // Structors mustn't present here.
+        // Bus();
+        // ~Bus();
 
         SY6502 cpu;
         std::array<uint8_t, 64 * 1024> ram;

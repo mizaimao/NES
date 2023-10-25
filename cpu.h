@@ -6,8 +6,9 @@ class Bus;
 
 class SY6502{
     public:
-        SY6502();
-        ~SY6502();
+        // Structors mustn't present here.
+        // SY6502();
+        // ~SY6502();
         void connect_bus(Bus *n){
             bus = n;
         }
