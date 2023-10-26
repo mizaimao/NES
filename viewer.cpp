@@ -142,7 +142,7 @@ class Viewer {
         void update_mem_string(){
             // Change variables here.
             uint16_t start = 0x0000;
-            uint16_t end = 0x00FF;
+            uint16_t end = 0x01FF;
             uint8_t n_items = 16;
 
             auto hex = [](uint32_t n, uint8_t d)
