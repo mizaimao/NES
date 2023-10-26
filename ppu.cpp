@@ -63,12 +63,22 @@ void PPU2C02::cpu_write(uint16_t addr, uint8_t data){
         }
 }
 
-// IO with PPU bus.
+// IO with PPU bus. IO is somewhat intercepted by the cartridge first. This may be is for future improvement.
+// Or just something I can delete later.
 uint8_t PPU2C02::ppu_read(uint16_t addr, bool read_only = false){
-    return 0;
+    uint8_t data = 0x00;
+    // Masking some addresses to bound PPU's address range.
+    addr &= 0x3FFF;
+
+    if (cart != nullptr and cart -> ppu_read(addr, read_only)){
+    }
+
+    return data;
 }
 
 void PPU2C02::ppu_write(uint16_t addr, uint8_t data){
-
+    addr &= 0x3FFF;
+    if (cart != nullptr and cart -> ppu_write(addr, data)){
+    }
 }
 

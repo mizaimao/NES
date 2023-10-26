@@ -856,8 +856,6 @@ std::map<uint16_t, std::string> SY6502::disassemble(uint16_t start, uint16_t end
 	};
 
     while (addr <= (uint32_t)end){
-
-
         line_addr = addr;
         // Generate instruction string.
         std::string instruction = "$" + hex(addr, 4) + ": ";
