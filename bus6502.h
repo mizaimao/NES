@@ -2,8 +2,8 @@
 #include <array>
 #include <memory>
 #include "cpu.h"
-// #include "ppu.h"
-// #include "nes_cartridge.h"
+#include "ppu.cpp"
+#include "nes_cartridge.h"
 
 class Bus{
     // Devices connected to the Bus.
@@ -15,11 +15,11 @@ class Bus{
         SY6502 cpu;
         std::array<uint8_t, 2048> cpu_ram;
 
-        // // Connect PPU to the bus.
-        // PPU2C02 ppu;
+        // Connect PPU to the bus.
+        PPU2C02 ppu;
 
-        // // Connect cartridge to the bus.
-        // std::shared_ptr<Cartridge> cart;
+        // Connect cartridge to the bus.
+        std::shared_ptr<Cartridge> cart;
 
     private:
         // VRAM holding name table information.

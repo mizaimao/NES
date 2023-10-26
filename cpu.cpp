@@ -3,10 +3,16 @@
 #include "cpu.h"
 #include "bus6502.h"
 
+using namespace::std;
 
 SY6502::SY6502(){
 
     std::cout << "CPU constructed" << std::endl;
+    cout<< "CPU flags  N:" << to_string(status & SY6502::N) << "  V:" << to_string(status & SY6502::V) << endl;
+    cout<< "CPU flags  U:" << to_string(status & SY6502::U) << "  B:" << to_string(status & SY6502::B) << endl;
+    cout<< "CPU flags  D:" << to_string(status & SY6502::D) << "  I:" << to_string(status & SY6502::I) << endl;
+    cout<< "CPU flags  Z:" << to_string(status & SY6502::Z) << "  C:" << to_string(status & SY6502::C) << endl;
+
     // Add instruction table.
     using s = SY6502;
     instruction_table = {
@@ -40,97 +46,6 @@ uint8_t SY6502::read(uint16_t addr, bool read_only = false){
     return bus -> cpu_read(addr, read_only);
 };
 
-// Disassembler function.
-std::map<uint16_t, std::string> SY6502::disassemble(uint16_t start, uint16_t end){
-    uint32_t addr = start;
-    uint8_t value = 0x00;
-    uint8_t low = 0x00;
-    uint8_t high = 0x00;
-
-    std::map<uint16_t, std::string> mapped_lines;
-    uint16_t line_addr = 0x0000;
-
-    // Utility stolen from the video to convert variable into hex string.
-    auto hex = [](uint32_t n, uint8_t d)
-	{
-		std::string s(d, '0');
-		for (int i = d - 1; i >= 0; i--, n >>= 4)
-			s[i] = "0123456789ABCDEF"[n & 0xF];
-		return s;
-	};
-
-    while (addr <= (uint32_t)end){
-
-
-        line_addr = addr;
-        // Generate instruction string.
-        std::string instruction = "$" + hex(addr, 4) + ": ";
-        
-        // Get opcode and its name.
-        uint8_t opcode = bus -> cpu_read(addr, true);
-        addr ++;
-        instruction += instruction_table[opcode].name + " ";
-
-        if (instruction_table[opcode].addrmode == &SY6502::IMP){
-            instruction += " {IMP}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::IMM){
-            value = bus->cpu_read(addr, true); addr++;
-            instruction += "#$" + hex(value, 2) + " {IMM}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ZP0){
-            low = bus->cpu_read(addr, true); addr++;
-            high = 0x00;												
-            instruction += "$" + hex(low, 2) + " {ZP0}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ZPX){
-            low = bus->cpu_read(addr, true); addr++;
-            high = 0x00;														
-            instruction += "$" + hex(low, 2) + ", X {ZPX}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ZPY){
-            low = bus->cpu_read(addr, true); addr++;
-            high = 0x00;														
-            instruction += "$" + hex(low, 2) + ", Y {ZPY}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::IZX){
-            low = bus->cpu_read(addr, true); addr++;
-            high = 0x00;								
-            instruction += "($" + hex(low, 2) + ", X) {IZX}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::IZY){
-            low = bus->cpu_read(addr, true); addr++;
-            high = 0x00;								
-            instruction += "($" + hex(low, 2) + "), Y {IZY}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ABS){
-            low = bus->cpu_read(addr, true); addr++;
-            high = bus->cpu_read(addr, true); addr++;
-            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + " {ABS}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ABX){
-            low = bus->cpu_read(addr, true); addr++;
-            high = bus->cpu_read(addr, true); addr++;
-            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + ", X {ABX}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::ABY){
-            low = bus->cpu_read(addr, true); addr++;
-            high = bus->cpu_read(addr, true); addr++;
-            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + ", Y {ABY}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::IND){
-            low = bus->cpu_read(addr, true); addr++;
-            high = bus->cpu_read(addr, true); addr++;
-            instruction += "($" + hex((uint16_t)(high << 8) | low, 4) + ") {IND}";
-        }
-        else if (instruction_table[opcode].addrmode == &SY6502::REL){
-            value = bus->cpu_read(addr, true); addr++;
-            instruction += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
-        }
-        mapped_lines[line_addr] = instruction;
-    }
-    return mapped_lines;
-}
 uint8_t SY6502::get_flag(FLAGS6502 f){
     return ((status & f) > 0) ? 1: 0;
 }
@@ -919,4 +834,96 @@ uint8_t SY6502::TYA(){
 // Illegal opcode placeholder.
 uint8_t SY6502::XXX(){
     return 0;
+}
+
+// Disassembler function.
+std::map<uint16_t, std::string> SY6502::disassemble(uint16_t start, uint16_t end){
+    uint32_t addr = start;
+    uint8_t value = 0x00;
+    uint8_t low = 0x00;
+    uint8_t high = 0x00;
+
+    std::map<uint16_t, std::string> mapped_lines;
+    uint16_t line_addr = 0x0000;
+
+    // Utility stolen from the video to convert variable into hex string.
+    auto hex = [](uint32_t n, uint8_t d)
+	{
+		std::string s(d, '0');
+		for (int i = d - 1; i >= 0; i--, n >>= 4)
+			s[i] = "0123456789ABCDEF"[n & 0xF];
+		return s;
+	};
+
+    while (addr <= (uint32_t)end){
+
+
+        line_addr = addr;
+        // Generate instruction string.
+        std::string instruction = "$" + hex(addr, 4) + ": ";
+        
+        // Get opcode and its name.
+        uint8_t opcode = bus -> cpu_read(addr, true);
+        addr ++;
+        instruction += instruction_table[opcode].name + " ";
+
+        if (instruction_table[opcode].addrmode == &SY6502::IMP){
+            instruction += " {IMP}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::IMM){
+            value = bus->cpu_read(addr, true); addr++;
+            instruction += "#$" + hex(value, 2) + " {IMM}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ZP0){
+            low = bus->cpu_read(addr, true); addr++;
+            high = 0x00;												
+            instruction += "$" + hex(low, 2) + " {ZP0}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ZPX){
+            low = bus->cpu_read(addr, true); addr++;
+            high = 0x00;														
+            instruction += "$" + hex(low, 2) + ", X {ZPX}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ZPY){
+            low = bus->cpu_read(addr, true); addr++;
+            high = 0x00;														
+            instruction += "$" + hex(low, 2) + ", Y {ZPY}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::IZX){
+            low = bus->cpu_read(addr, true); addr++;
+            high = 0x00;								
+            instruction += "($" + hex(low, 2) + ", X) {IZX}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::IZY){
+            low = bus->cpu_read(addr, true); addr++;
+            high = 0x00;								
+            instruction += "($" + hex(low, 2) + "), Y {IZY}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ABS){
+            low = bus->cpu_read(addr, true); addr++;
+            high = bus->cpu_read(addr, true); addr++;
+            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + " {ABS}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ABX){
+            low = bus->cpu_read(addr, true); addr++;
+            high = bus->cpu_read(addr, true); addr++;
+            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + ", X {ABX}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::ABY){
+            low = bus->cpu_read(addr, true); addr++;
+            high = bus->cpu_read(addr, true); addr++;
+            instruction += "$" + hex((uint16_t)(high << 8) | low, 4) + ", Y {ABY}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::IND){
+            low = bus->cpu_read(addr, true); addr++;
+            high = bus->cpu_read(addr, true); addr++;
+            instruction += "($" + hex((uint16_t)(high << 8) | low, 4) + ") {IND}";
+        }
+        else if (instruction_table[opcode].addrmode == &SY6502::REL){
+            value = bus->cpu_read(addr, true); addr++;
+            instruction += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
+        }
+        mapped_lines[line_addr] = instruction;
+    }
+    return mapped_lines;
 }
