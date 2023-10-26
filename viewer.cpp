@@ -6,16 +6,16 @@
 using namespace std;
 
 
-const int WIDTH = 1380;
+const int WIDTH = 1450;
 const int HEIGHT = 480;
-const int DEBUGGER_OFFSET = 640;
+const int DEBUGGER_OFFSET = 512;
 
 const bool ENABLE_DEBUGGER = true;
 const int DEBUGGER_FONT_SIZE = 15;
 // Disassembler view location.
-const int DEBUGGER_DSB_Y_POS = 20;
+const int DEBUGGER_DSB_Y_POS = 120;
 const int DEBUGGER_DSB_X_POS = 470;
-const int DEBUGGER_DSB_COUNT = 24;
+const int DEBUGGER_DSB_COUNT = 20;
 
 
 class Viewer {
@@ -32,7 +32,7 @@ class Viewer {
         string dsb_string = "";
         string status_string = "";
         string register_string = "";
-        string hint_string = "";
+        string hint_string = "= C: STEP CPU = F: STEP FRAME = R: RESET = I: IRP (CPU) =\n= N: NMI (CPU) = SPACE: TOGGLE REALTIME [ ] = D: EXIT =";
         
 
         Bus *bus = nullptr;
@@ -50,6 +50,14 @@ class Viewer {
             }
             bus = p_bus;
             update_debug_strings();
+        };
+
+        std::string hex(uint32_t n, uint8_t d)
+        {
+            std::string s(d, '0');
+            for (int i = d - 1; i >= 0; i--, n >>= 4)
+                s[i] = "0123456789ABCDEF"[n & 0xF];
+            return s;
         };
 
         void update_debug_strings(){
@@ -136,6 +144,11 @@ class Viewer {
             dsb_text.setPosition(DEBUGGER_DSB_X_POS + DEBUGGER_OFFSET, DEBUGGER_DSB_Y_POS);
             window->draw(dsb_text);
 
+            // Hint view.
+            sf::Text hint_text(hint_string, font, DEBUGGER_FONT_SIZE);
+            hint_text.setPosition(DEBUGGER_DSB_X_POS + DEBUGGER_OFFSET, DEBUGGER_DSB_Y_POS + 320);
+            window->draw(hint_text);
+
 
         }
 
@@ -145,13 +158,6 @@ class Viewer {
             uint16_t end = 0x01FF;
             uint8_t n_items = 16;
 
-            auto hex = [](uint32_t n, uint8_t d)
-            {
-                std::string s(d, '0');
-                for (int i = d - 1; i >= 0; i--, n >>= 4)
-                    s[i] = "0123456789ABCDEF"[n & 0xF];
-                return s;
-            };
 
             mem_string.clear();
             for (uint16_t addr = start; addr < end; addr += n_items){
@@ -167,14 +173,6 @@ class Viewer {
         void update_status_register_string(){
             status_string.clear();
             register_string.clear();
-
-            auto hex = [](uint32_t n, uint8_t d)
-            {
-                std::string s(d, '0');
-                for (int i = d - 1; i >= 0; i--, n >>= 4)
-                    s[i] = "0123456789ABCDEF"[n & 0xF];
-                return s;
-            };
 
             // Format status string.
             int status_bools[8] = {
@@ -211,15 +209,16 @@ class Viewer {
             register_string += "A:  $" + hex(a_content, 2) + "    [" + to_string(a_content) + "]\n";
             register_string += "X:  $" + hex(x_content, 2) + "    [" + to_string(x_content) + "]\n";
             register_string += "Y:  $" + hex(y_content, 2) + "    [" + to_string(y_content) + "]\n";
-            register_string += "Stack Pointer: $" + hex(stkp_content, 4) + "\n\n";
+            register_string += "Stack Pointer: $" + hex(stkp_content, 4) + "\n";
             register_string += "Remaining cycles: " + to_string(remaining_cycle) + "\n";
         }
 
         void update_dsb_string(){
             dsb_string.clear();
+            dsb_string.append("\n");
 
-            int upper_n = (int)DEBUGGER_DSB_COUNT / 2;  // Lines above current instruction.
-            int lower_n = DEBUGGER_DSB_COUNT - 1 - upper_n;  // And below.
+            int lower_n = (int)DEBUGGER_DSB_COUNT / 2;  // Lines above current instruction.
+            int upper_n = DEBUGGER_DSB_COUNT - 1 - lower_n;  // And below.
 
             map<uint16_t, std::string> mapped = bus->cpu.disassemble(0x0000, 0xFFFF);
             uint16_t current_addr = bus->cpu.pc;
@@ -310,9 +309,23 @@ class Viewer {
                             redraw_debugger = true;
 
                             switch (event.key.code){
-                                case sf::Keyboard::N:
-                                    cout << "N pressed" << endl;
+                                case sf::Keyboard::C:
                                     bus->cpu.clock();
+                                    break;
+                                case sf::Keyboard::F:
+                                    cout << "F pressed" << endl;
+                                    //bus->cpu.clock();
+                                    break;
+                                case sf::Keyboard::R:
+                                    bus->cpu.reset();
+                                    break;
+                                case sf::Keyboard::I:
+                                    bus->cpu.irq();
+                                    break;
+                                case sf::Keyboard::N:
+                                    bus->cpu.nmi();
+                                    break;
+                                case sf::Keyboard::Space:
                                     break;
                                 case sf::Keyboard::D:
                                     window.close();
