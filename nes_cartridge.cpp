@@ -35,51 +35,9 @@ Cartridge::Cartridge(const std::string& filename){
 Cartridge::~Cartridge(){}
 
 void Cartridge::cpu_write(uint16_t addr, uint8_t data){
-    switch (addr){
-        case 0x0000:  // Control.
-            break;
-        case 0x0001:  // Mask.
-            break;
-        case 0x0002:  // Status.
-            break;
-        case 0x0003:  // OAM address.
-            break;
-        case 0x0004:  // OAM Data.
-            break;
-        case 0x0005:  // Scroll.
-            break;
-        case 0x0006:  // PPU Address.
-            break;
-        case 0x0007:  // PPU Data.
-            break;
-
-        default:
-            break;
-        }
 }
 uint8_t Cartridge::cpu_read(uint16_t addr, bool read_only = false){
     uint8_t data = 0x00;
-    switch (addr){
-    case 0x0000:  // Control.
-        break;
-    case 0x0001:  // Mask.
-        break;
-    case 0x0002:  // Status.
-        break;
-    case 0x0003:  // OAM address.
-        break;
-    case 0x0004:  // OAM Data.
-        break;
-    case 0x0005:  // Scroll.
-        break;
-    case 0x0006:  // PPU Address.
-        break;
-    case 0x0007:  // PPU Data.
-        break;
-
-    default:
-        break;
-    }
     return data;
 }
 

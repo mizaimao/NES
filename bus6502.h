@@ -35,7 +35,7 @@ class Bus{
 
     public:
         // NES operations.
-        // void insert_cartridge(const std::shared_ptr<Cartridge>& cartridge);
+        void insert_cartridge(const std::shared_ptr<Cartridge>& cartridge);
         void reset();  // Reset button on a NES machine.
         void clock();  // Performs system tick.
 
