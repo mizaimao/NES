@@ -1,4 +1,4 @@
-#include <array>
+#pragma once
 #include "bus6502.h"
 
 Bus::Bus(){
@@ -17,25 +17,28 @@ void Bus::cpu_write(uint16_t addr, uint8_t data){
     if (0x0000 <= addr and addr <= 0x1FFF){
         cpu_ram[addr & 0x07FF] = data;  // 0x07FF is 2048.
     } else if (0x2000 <= addr and addr <= 0x3FFF)
-        ppu.ppu_write(addr & 0x0007, data);
+        //ppu.ppu_write(addr & 0x0007, data);
+        return;
 };
 
 uint8_t Bus::cpu_read(uint16_t addr, bool read_only = false){
     uint8_t data = 0x00;
 
-    if (0x0000 <= addr and addr <= 0x1FFF){
+    if (0x0000 <= addr and addr <= 0x1FFF)
         return cpu_ram[addr & 0x07FF];
-    } else if (0x2000 <= addr and addr <= 0x3FFF)
-        return ppu.ppu_read(addr & 0x0007, read_only);
+    else if (0x2000 <= addr and addr <= 0x3FFF)
+        return data; //return ppu.ppu_read(addr & 0x0007, read_only);
 
     return data;
-};
+};// IO of bus.
+        uint8_t read(uint16_t addr, bool read_only);
+	    void    write(uint16_t addr, uint8_t data);
 
-void Bus::insert_cartridge(const std::shared_ptr<Cartridge>& cartridge){
-    this->cart = cartridge;
-    ppu.connect_cartridge(cartridge);
+// void Bus::insert_cartridge(const std::shared_ptr<Cartridge>& cartridge){
+//     this->cart = cartridge;
+//     ppu.connect_cartridge(cartridge);
 
-}
+// }
 // Reset button on a NES machine.
 void Bus::reset(){
     cpu.reset();
