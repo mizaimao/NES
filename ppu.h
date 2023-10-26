@@ -12,11 +12,11 @@ class PPU2C02{
 
         // IO with main bus.
         void cpu_write(uint16_t addr, uint8_t data);
-        uint8_t cpu_read(uint16_t addr, bool read_only = false);
+        uint8_t cpu_read(uint16_t addr, bool read_only);
         
         // IO with PPU bus.
         void ppu_write(uint16_t addr, uint8_t data);
-        uint8_t ppu_read(uint16_t addr, bool read_only = false);
+        uint8_t ppu_read(uint16_t addr, bool read_only);
 
     public:
         // Interface with cartridge.
