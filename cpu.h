@@ -1,4 +1,6 @@
 #pragma once
+
+#include <vector>
 #include <iostream>
 #include <string>
 #include <map>
@@ -48,7 +50,9 @@ class SY6502{
         void irq();  // Interrupt request. May get ignored by flag I.
         void nmi();  // Non-maskable interrupt request. Cannot be ignored.
 
-    private:
+        // Disassembler.
+        std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end);
+
         Bus *bus = nullptr;
 
         // IO of bus.
@@ -66,9 +70,7 @@ class SY6502{
         uint8_t opcode = 0x00;  // Current opcode.
         uint8_t cycles = 0;  // Remaining cycles of current operation.
 
-        // Disassembler.
-        std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end);
-
+    private:
         // For each of the operation, we emulate addressing mode
         // and operation.
         // 12 addressing modes.
@@ -94,5 +96,6 @@ class SY6502{
 
         // Illegal operations are caught here.
         uint8_t XXX();
+        
 };
     
