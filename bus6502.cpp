@@ -57,5 +57,11 @@ void Bus::reset(){
 }
 // Performs system tick.
 void Bus::clock(){
+    ppu.clock();
 
+    if (system_clock_counter % 3 == 0){
+        cpu.clock();
+    }
+
+    system_clock_counter++;
 }

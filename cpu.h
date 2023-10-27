@@ -50,6 +50,8 @@ class SY6502{
         void irq();  // Interrupt request. May get ignored by flag I.
         void nmi();  // Non-maskable interrupt request. Cannot be ignored.
 
+        bool complete();
+
         // Disassembler.
         std::map<uint16_t, std::string> disassemble(uint16_t start, uint16_t end);
 

@@ -4,6 +4,8 @@
 #include <memory>
 #include "nes_cartridge.h"
 
+const int PIXEL_COUNT = 256 * 240 * 3;  // NES window size times RGB.
+
 class PPU2C02{
 
     public:
@@ -26,4 +28,25 @@ class PPU2C02{
     private:
         // Local pointer to cartridge as PPU can access a cartridge.
         std::shared_ptr<Cartridge> cart;
+
+        int16_t scan_line = 0;  // Row on the screen.
+        int16_t cycle = 0;  // Col on the screen.
+        
+    public:
+        // This section stores what's being displayed.
+        uint8_t pixels[PIXEL_COUNT] = {};
+        uint8_t sprite_screen[PIXEL_COUNT] = {};
+        uint8_t sprite_table[2][PIXEL_COUNT] = {};
+        uint8_t pattern_table[2][128] = {};
+
+        // Functions to access what's being displayed.
+        uint8_t & get_sprite_screen();
+        uint8_t & get_sprite_table(uint8_t i);
+        uint8_t & get_pattern_table(uint8_t i);
+        bool frame_complete = false;
+
+    public:
+        // Emulation related.
+        bool is_emulation_run = false;  // True means run emulation in realtime.
+        float residual_time = 0.0f;
 };
