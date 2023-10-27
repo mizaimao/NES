@@ -283,7 +283,8 @@ class Viewer {
             register_string += "Stack Pointer: $" + hex(stkp_content, 4) + "\n";
             register_string += "Remaining cycles: " + to_string(remaining_cycle) + "\n";
             register_string += "System clock count: " + to_string(bus->system_clock_counter) + "\n";
-            register_string += "Frame draw: " + to_string(frame_counter) + "\n";
+            register_string += "Window frame draw: " + to_string(frame_counter) + "\n";
+            register_string += "PPU frame draw: " + to_string(bus->ppu.ppu_frame_draw) + "\n";
         }
 
         void update_dsb_string(){

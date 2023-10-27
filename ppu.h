@@ -44,6 +44,7 @@ class PPU2C02{
         uint8_t & get_sprite_table(uint8_t i);
         uint8_t & get_pattern_table(uint8_t i);
         bool frame_complete = false;
+        int ppu_frame_draw = 0;
 
     public:
         // Emulation related.
