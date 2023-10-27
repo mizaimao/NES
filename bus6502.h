@@ -39,6 +39,6 @@ class Bus{
         void reset();  // Reset button on a NES machine.
         void clock();  // Performs system ticks.
 
-    private:
+    public:  // Should have been private.
         uint32_t system_clock_counter = 0;
 };

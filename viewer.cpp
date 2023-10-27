@@ -5,6 +5,7 @@
 
 using namespace std;
 
+const float TARGET_FPS = 0.1f;
 
 const int WIDTH = 1450;
 const int HEIGHT = 480;
@@ -16,6 +17,7 @@ const int DEBUGGER_FONT_SIZE = 15;
 const int DEBUGGER_DSB_Y_POS = 120;
 const int DEBUGGER_DSB_X_POS = 470;
 const int DEBUGGER_DSB_COUNT = 20;
+const sf::Color DEBUGGER_TEXT_COLOR = sf::Color(200, 200, 200, 255);
 
 
 class Viewer {
@@ -32,11 +34,12 @@ class Viewer {
         string dsb_string = "";
         string status_string = "";
         string register_string = "";
-        string hint_string = "= C: STEP CPU = F: STEP FRAME = R: RESET = I: IRP (CPU) =\n= N: NMI (CPU) = SPACE: TOGGLE REALTIME [ ] = D: EXIT =";
+        string hint_string = "";
         
 
         Bus *bus = nullptr;
         sf::Uint8* pixels = new sf::Uint8[WIDTH * HEIGHT * 4];
+        sf::Uint8* ppu_image = new sf::Uint8[256 * 240 * 3];
 
         Viewer(Bus * p_bus){
             // array of pixels
@@ -46,6 +49,12 @@ class Viewer {
                 pixels[pi] = 0;
                 pixels[pi + 1] = 0;
                 pixels[pi + 2] = 0;
+                pixels[pi + 3] = 255;
+            }
+            for (int pi = 0; pi < 256 * 240 * 4; pi += 4){
+                ppu_image[pi] = 0;
+                ppu_image[pi + 1] = 0;
+                ppu_image[pi + 2] = 0;
                 pixels[pi + 3] = 255;
             }
             bus = p_bus;
@@ -64,6 +73,7 @@ class Viewer {
             update_mem_string();
             update_dsb_string();
             update_status_register_string();
+            update_hint_string();
         }
 
         // Fill the pixel array with black RGB and 255 alpha.
@@ -88,6 +98,31 @@ class Viewer {
             pixels[location] = color[0];
             pixels[location + 1 ] = color[1];
             pixels[location + 2 ] = color[2];
+        }
+
+        // Copy sprite_screen from PPU to pixel array.
+        // Copy from RGB to RBGA.
+        void draw_from_ppu(int zoom = 1){
+            //cout << "Got PPU image at location 0 " << to_string(ppu_image[0]) << endl;
+
+            for (int y = 0; y < 240; y ++){
+                for (int x = 0; x < 256; x ++){
+                    int src_index = y * 256 * 3 + x * 3;
+                    int tgt_index = y * 256 * 4 + x * 4;
+
+                    int pixel_offset = y * (WIDTH - 256 * zoom) * 4;
+                    
+                    pixels[pixel_offset + tgt_index] = bus -> ppu.sprite_screen[src_index];
+                    pixels[pixel_offset + tgt_index + 1] = bus -> ppu.sprite_screen[src_index + 1];
+                    pixels[pixel_offset + tgt_index + 2] = bus -> ppu.sprite_screen[src_index + 2];
+                }
+            }
+            // for (int pixel_i = 0; pixel_i < 256 * 240 * 4; pixel_i++){
+            //     if ( (pixel_i + 1) % 4 != 0 ){
+            //         pixels[pixel_i] = bus -> ppu.sprite_screen[pixel_i];
+            //         //ppu_image[pixel_i] = bus->ppu.sprite_screen[pixel_i - (int)((pixel_i + 1) / 4)];
+            //     }
+            // }
         }
 
         void draw_ract(int x_start, int x_end, int y_start, int y_end, int fill){
@@ -132,21 +167,25 @@ class Viewer {
             // Memory view.
             sf::Text mem_view_sf_text(mem_string, font, DEBUGGER_FONT_SIZE);
             mem_view_sf_text.setPosition(0 + DEBUGGER_OFFSET, 0);
+            mem_view_sf_text.setFillColor(DEBUGGER_TEXT_COLOR);
             window->draw(mem_view_sf_text);
 
             // Status and register view.
             sf::Text register_view_sf_text(register_string, font, DEBUGGER_FONT_SIZE);
             register_view_sf_text.setPosition(DEBUGGER_DSB_X_POS + DEBUGGER_OFFSET, 0);
+            register_view_sf_text.setFillColor(DEBUGGER_TEXT_COLOR);
             window->draw(register_view_sf_text);
 
             // Disassembler view.
             sf::Text dsb_text(dsb_string, font, DEBUGGER_FONT_SIZE);
             dsb_text.setPosition(DEBUGGER_DSB_X_POS + DEBUGGER_OFFSET, DEBUGGER_DSB_Y_POS);
+            dsb_text.setFillColor(DEBUGGER_TEXT_COLOR);
             window->draw(dsb_text);
 
             // Hint view.
             sf::Text hint_text(hint_string, font, DEBUGGER_FONT_SIZE);
             hint_text.setPosition(DEBUGGER_DSB_X_POS + DEBUGGER_OFFSET, DEBUGGER_DSB_Y_POS + 320);
+            hint_text.setFillColor(DEBUGGER_TEXT_COLOR);
             window->draw(hint_text);
 
 
@@ -211,6 +250,7 @@ class Viewer {
             register_string += "Y:  $" + hex(y_content, 2) + "    [" + to_string(y_content) + "]\n";
             register_string += "Stack Pointer: $" + hex(stkp_content, 4) + "\n";
             register_string += "Remaining cycles: " + to_string(remaining_cycle) + "\n";
+            register_string += "System clock count: " + to_string(bus->system_clock_counter) + "\n";
         }
 
         void update_dsb_string(){
@@ -250,6 +290,16 @@ class Viewer {
                 }
         }
 
+        void update_hint_string(){
+            hint_string.clear();
+            hint_string += "= C: STEP CPU = F: STEP FRAME = R: RESET = I: IRP (CPU) =\n= N: NMI (CPU) = SPACE: TOGGLE REALTIME [";
+            if (bus->ppu.is_emulation_run)
+                hint_string.append("X");
+            else
+                hint_string.append(" ");
+            hint_string +=  "] = D: EXIT =";
+        }
+
         int launch_window(){
             // Create the main window
             sf::RenderWindow window(
@@ -260,7 +310,7 @@ class Viewer {
             );
 
             // Control FPS here.
-            window.setFramerateLimit(60);
+            window.setFramerateLimit(TARGET_FPS);
         
             // Load a sprite to display
             sf::Texture texture;
@@ -273,7 +323,7 @@ class Viewer {
             if (!font.loadFromFile("PerfectDOSVGA437.ttf"))
                 return EXIT_FAILURE;
             sf::Text text("Chicken text message\nBreakline", font, 20);
-            text.setPosition(300, 300);
+            text.setPosition(0, 0);
             // Load a music to play
             // sf::Music music;
             // if (!music.openFromFile("nice_music.ogg"))
@@ -288,92 +338,104 @@ class Viewer {
             frame_texture.update(pixels);
             sf::Sprite sprite;
             sprite.setTexture(frame_texture);
+            // sprite.setOrigin(DEBUGGER_OFFSET, 0);
+            // sprite.setPosition(DEBUGGER_OFFSET, 0);
+            
+            // sf::Sprite ppu_sprite;
+            // sf::Texture ppu_frame_texture;
+            // ppu_frame_texture.create(DEBUGGER_OFFSET, HEIGHT);
+            // ppu_sprite.setTexture(ppu_frame_texture);
 
-            bool redraw_debugger = false;
-        
             // Start the game loop
             while (window.isOpen())
             {
-                redraw_debugger = false;
                 while (window.pollEvent(event))
                 {
 
-                    // Close window: exit
-                    switch (event.type) {
-                        case sf::Event::Closed:
-                            window.close();
-                            break;
+                    if (bus->ppu.is_emulation_run){
+                        do { bus->clock(); } while ( not bus->ppu.frame_complete);
+                        bus->ppu.frame_complete = false;
 
-                        case sf::Event::KeyPressed:
+                    }
 
-                            redraw_debugger = true;
+                    else
+                    {
+                        // Close window: exit
+                        switch (event.type) {
+                            case sf::Event::Closed:
+                                window.close();
+                                break;
 
-                            switch (event.key.code){
-                                case sf::Keyboard::C:
-                                    bus->cpu.clock();
-                                    break;
-                                case sf::Keyboard::F:
-                                    cout << "F pressed" << endl;
-                                    //bus->cpu.clock();
-                                    break;
-                                case sf::Keyboard::R:
-                                    bus->cpu.reset();
-                                    break;
-                                case sf::Keyboard::I:
-                                    bus->cpu.irq();
-                                    break;
-                                case sf::Keyboard::N:
-                                    bus->cpu.nmi();
-                                    break;
-                                case sf::Keyboard::Space:
-                                    break;
-                                case sf::Keyboard::D:
-                                    window.close();
-                                    break;
-                                case sf::Keyboard::Up:
-                                    upper_block();
-                                    frame_texture.update(pixels);
-                                    sprite.setTexture(frame_texture);
-                                    break;
-                                case sf::Keyboard::Down:
-                                    lower_block();
-                                    frame_texture.update(pixels);
-                                    sprite.setTexture(frame_texture);
-                                    break;
+                            case sf::Event::KeyPressed:
 
-                                case sf::Keyboard::Left:
-                                    left_block();
-                                    frame_texture.update(pixels);
-                                    sprite.setTexture(frame_texture);
-                                    break;
+                                switch (event.key.code){
+                                    case sf::Keyboard::C:
+                                        // CPU ticks every three times PPU and system ticks.
+                                        // Additional loop to drain out CPU cycles.
+                                        do { bus->clock(); } while ( not bus->cpu.complete());
+                                        do { bus->clock(); } while ( not bus->cpu.complete());
+                                        //std::cout << "Loading at 0: " << std::to_string(bus->ppu.sprite_screen[0]) << std::endl;
+                                        break;
+                                    case sf::Keyboard::F:
+                                        do { bus->clock(); } while ( not bus->ppu.frame_complete);
+                                        do { bus->clock(); } while ( not bus->cpu.complete());
+                                        bus->ppu.frame_complete = false;
+                                        //bus->cpu.clock();
+                                        break;
+                                    case sf::Keyboard::R:
+                                        bus->reset();
+                                        break;
+                                    case sf::Keyboard::I:
+                                        bus->cpu.irq();
+                                        break;
+                                    case sf::Keyboard::N:
+                                        bus->cpu.nmi();
+                                        break;
+                                    case sf::Keyboard::Space:
+                                        bus->ppu.is_emulation_run = not bus->ppu.is_emulation_run;
+                                        break;
+                                    case sf::Keyboard::D:
+                                        window.close();
+                                        break;
+                                    case sf::Keyboard::Up:
+                                        upper_block();
+                                        break;
+                                    case sf::Keyboard::Down:
+                                        lower_block();
+                                        break;
 
-                                case sf::Keyboard::Right:
-                                    right_block();
-                                    frame_texture.update(pixels);
-                                    sprite.setTexture(frame_texture);
-                                    break;
+                                    case sf::Keyboard::Left:
+                                        left_block();
+                                        break;
 
-                                default:
-                                    break;
+                                    case sf::Keyboard::Right:
+                                        right_block();
+                                        break;
 
-                            }
-                            break;
+                                    default:
+                                        break;
 
-                        default:
-                            break;
+                                }
+                                break;
+
+                            default:
+                                break;
+                        }
                     }
         
                     // Clear screen
                     window.clear();
             
                     // Draw the sprite
+                    draw_from_ppu();
+                    frame_texture.update(pixels);
+                    sprite.setTexture(frame_texture);
                     window.draw(sprite);
+                    //window.draw(ppu_sprite);
             
                     // Draw the string
                     window.draw(text);
-
-                    if (redraw_debugger)
-                        update_debug_strings();
+                    update_debug_strings();
 
                     if (ENABLE_DEBUGGER)
                         draw_debugger_pane(&window, font);

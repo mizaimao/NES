@@ -77,6 +77,10 @@ void SY6502::clock(){
     cycles--;
 }
 
+bool SY6502::complete(){
+    return cycles == 0;
+}
+
 uint8_t SY6502::fetch(){
     // Exception is IMP because there is nothing to fetch.
     if (instruction_table[opcode].addrmode != &SY6502::IMP)
