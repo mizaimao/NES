@@ -22,8 +22,8 @@ void PPU2C02::clock(){
 
         uint8_t single_color = rand() % 255;
         sprite_screen[draw_pos] = single_color;
-        sprite_screen[draw_pos + 1] = single_color;
-        sprite_screen[draw_pos + 2] = single_color;
+        sprite_screen[draw_pos + 1] = rand() % 255;
+        sprite_screen[draw_pos + 2] = rand() % 255;
 
         //std::cout << "Drawing at loc " << std::to_string(draw_pos) << " with value " << std::to_string(sprite_screen[draw_pos]) << std::endl;
 
