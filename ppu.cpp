@@ -36,6 +36,7 @@ void PPU2C02::clock(){
         if (scan_line >= 261){
             scan_line = -1;  // Will be explained when writing PPU. 
             frame_complete = true;
+            ppu_frame_draw++;
         }
     }
 }

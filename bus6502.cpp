@@ -54,6 +54,7 @@ void Bus::insert_cartridge(const std::shared_ptr<Cartridge>& cartridge){
 void Bus::reset(){
     cpu.reset();
     system_clock_counter = 0;
+    ppu.ppu_frame_draw = 0;
 }
 // Performs system tick.
 void Bus::clock(){
