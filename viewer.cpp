@@ -1,15 +1,16 @@
 #include <iostream>
 #include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
 #include "bus6502.cpp"
 
 using namespace std;
 
-const float TARGET_FPS = 0.1f;
+const float TARGET_FPS = 60.0f;
 
 const int WIDTH = 1450;
 const int HEIGHT = 480;
-const int DEBUGGER_OFFSET = 512;
+const int DEBUGGER_OFFSET = 512 + 10;
 
 const bool ENABLE_DEBUGGER = true;
 const int DEBUGGER_FONT_SIZE = 15;
@@ -22,8 +23,7 @@ const sf::Color DEBUGGER_TEXT_COLOR = sf::Color(200, 200, 200, 255);
 
 class Viewer {
     private:
-        int offset = 1000000;
-        int offset_size = 100000;
+        int frame_counter = 0;
 
     public:
         int width = WIDTH;
@@ -39,7 +39,8 @@ class Viewer {
 
         Bus *bus = nullptr;
         sf::Uint8* pixels = new sf::Uint8[WIDTH * HEIGHT * 4];
-        sf::Uint8* ppu_image = new sf::Uint8[256 * 240 * 3];
+        // Pixel array but in shader format.
+        sf::VertexArray ppu_image_va;
 
         Viewer(Bus * p_bus){
             // array of pixels
@@ -51,12 +52,10 @@ class Viewer {
                 pixels[pi + 2] = 0;
                 pixels[pi + 3] = 255;
             }
-            for (int pi = 0; pi < 256 * 240 * 4; pi += 4){
-                ppu_image[pi] = 0;
-                ppu_image[pi + 1] = 0;
-                ppu_image[pi + 2] = 0;
-                pixels[pi + 3] = 255;
-            }
+
+            // Initialize vertex array.
+            ppu_image_va.setPrimitiveType(sf::Triangles);
+            ppu_image_va.resize(256 * 240 * 6);
             bus = p_bus;
             update_debug_strings();
         };
@@ -103,7 +102,7 @@ class Viewer {
         // Copy sprite_screen from PPU to pixel array.
         // Copy from RGB to RBGA.
         void draw_from_ppu(int zoom = 1){
-            //cout << "Got PPU image at location 0 " << to_string(ppu_image[0]) << endl;
+            cout << "CALLED " << frame_counter  <<endl;
 
             for (int y = 0; y < 240; y ++){
                 for (int x = 0; x < 256; x ++){
@@ -117,12 +116,45 @@ class Viewer {
                     pixels[pixel_offset + tgt_index + 2] = bus -> ppu.sprite_screen[src_index + 2];
                 }
             }
-            // for (int pixel_i = 0; pixel_i < 256 * 240 * 4; pixel_i++){
-            //     if ( (pixel_i + 1) % 4 != 0 ){
-            //         pixels[pixel_i] = bus -> ppu.sprite_screen[pixel_i];
-            //         //ppu_image[pixel_i] = bus->ppu.sprite_screen[pixel_i - (int)((pixel_i + 1) / 4)];
-            //     }
-            // }
+        }
+        void add_pixel_shader(int x, int y, sf::Color pixel_color, float scale){
+            int tgt_index = (y * 256 + x) * 6;  // Two triangles, six vertices.
+            sf::Vertex* triangles = &ppu_image_va[tgt_index];
+            triangles[0].color = pixel_color;
+            triangles[1].color = pixel_color;
+            triangles[2].color = pixel_color;
+            triangles[3].color = pixel_color;
+            triangles[4].color = pixel_color;
+            triangles[5].color = pixel_color;
+
+            triangles[0].position = sf::Vector2f( x * scale, y * scale) ;
+            triangles[1].position = sf::Vector2f( x * scale, (y + 1) * scale );
+            triangles[2].position = sf::Vector2f( (x + 1) * scale, y * scale );
+            triangles[3].position = sf::Vector2f( (x + 1) * scale, y * scale );
+            triangles[4].position = sf::Vector2f( (x + 1) * scale, (y + 1) * scale );
+            triangles[5].position = sf::Vector2f( x * scale, (y + 1) * scale );
+        }
+
+        void draw_from_ppu_shader(float scale = 2.0f){
+
+            if (ppu_image_va.getVertexCount() == 0){
+                cout << "Vertex count is zero." << endl;
+            }
+
+            for (int y = 0; y < 240; y ++){
+                for (int x = 0; x < 256; x ++){
+                    int src_index = y * 256 * 3 + x * 3;
+                    
+                    sf::Color pixel_color(
+                        bus -> ppu.sprite_screen[src_index],
+                        bus -> ppu.sprite_screen[src_index + 1],
+                        bus -> ppu.sprite_screen[src_index + 2]
+                    );
+                    add_pixel_shader(x, y, pixel_color, scale);
+                    //cout << x << " " << y << endl;
+                    
+                }
+            }
         }
 
         void draw_ract(int x_start, int x_end, int y_start, int y_end, int fill){
@@ -251,6 +283,7 @@ class Viewer {
             register_string += "Stack Pointer: $" + hex(stkp_content, 4) + "\n";
             register_string += "Remaining cycles: " + to_string(remaining_cycle) + "\n";
             register_string += "System clock count: " + to_string(bus->system_clock_counter) + "\n";
+            register_string += "Frame draw: " + to_string(frame_counter) + "\n";
         }
 
         void update_dsb_string(){
@@ -310,7 +343,7 @@ class Viewer {
             );
 
             // Control FPS here.
-            window.setFramerateLimit(TARGET_FPS);
+            window.setFramerateLimit(60);
         
             // Load a sprite to display
             sf::Texture texture;
@@ -338,114 +371,105 @@ class Viewer {
             frame_texture.update(pixels);
             sf::Sprite sprite;
             sprite.setTexture(frame_texture);
-            // sprite.setOrigin(DEBUGGER_OFFSET, 0);
-            // sprite.setPosition(DEBUGGER_OFFSET, 0);
-            
-            // sf::Sprite ppu_sprite;
-            // sf::Texture ppu_frame_texture;
-            // ppu_frame_texture.create(DEBUGGER_OFFSET, HEIGHT);
-            // ppu_sprite.setTexture(ppu_frame_texture);
 
             // Start the game loop
             while (window.isOpen())
             {
+                if (bus->ppu.is_emulation_run){
+                    do { bus->clock(); } while ( not bus->ppu.frame_complete);
+                    bus->ppu.frame_complete = false;
+                }
                 while (window.pollEvent(event))
                 {
-
-                    if (bus->ppu.is_emulation_run){
-                        do { bus->clock(); } while ( not bus->ppu.frame_complete);
-                        bus->ppu.frame_complete = false;
-
-                    }
-
-                    else
-                    {
+                    switch (event.type) {
                         // Close window: exit
-                        switch (event.type) {
-                            case sf::Event::Closed:
-                                window.close();
-                                break;
+                        case sf::Event::Closed:
+                            window.close();
+                            break;
 
-                            case sf::Event::KeyPressed:
+                        case sf::Event::KeyPressed:
+                            switch (event.key.code){
+                                case sf::Keyboard::C:
+                                    // CPU ticks every three times PPU and system ticks.
+                                    // Additional loop to drain out CPU cycles.
+                                    do { bus->clock(); } while ( not bus->cpu.complete());
+                                    do { bus->clock(); } while ( not bus->cpu.complete());
+                                    //std::cout << "Loading at 0: " << std::to_string(bus->ppu.sprite_screen[0]) << std::endl;
+                                    break;
+                                case sf::Keyboard::F:
+                                    do { bus->clock(); } while ( not bus->ppu.frame_complete);
+                                    do { bus->clock(); } while ( not bus->cpu.complete());
+                                    bus->ppu.frame_complete = false; 
+                                    //bus->cpu.clock();
+                                    break;
+                                case sf::Keyboard::R:
+                                    bus->reset();
+                                    break;
+                                case sf::Keyboard::I:
+                                    bus->cpu.irq();
+                                    break;
+                                case sf::Keyboard::N:
+                                    bus->cpu.nmi();
+                                    break;
+                                case sf::Keyboard::Space:
+                                    bus->ppu.is_emulation_run = not bus->ppu.is_emulation_run;
+                                    break;
+                                case sf::Keyboard::D:
+                                    window.close();
+                                    break;
+                                case sf::Keyboard::Up:
+                                    upper_block();
+                                    break;
+                                case sf::Keyboard::Down:
+                                    lower_block();
+                                    break;
 
-                                switch (event.key.code){
-                                    case sf::Keyboard::C:
-                                        // CPU ticks every three times PPU and system ticks.
-                                        // Additional loop to drain out CPU cycles.
-                                        do { bus->clock(); } while ( not bus->cpu.complete());
-                                        do { bus->clock(); } while ( not bus->cpu.complete());
-                                        //std::cout << "Loading at 0: " << std::to_string(bus->ppu.sprite_screen[0]) << std::endl;
-                                        break;
-                                    case sf::Keyboard::F:
-                                        do { bus->clock(); } while ( not bus->ppu.frame_complete);
-                                        do { bus->clock(); } while ( not bus->cpu.complete());
-                                        bus->ppu.frame_complete = false;
-                                        //bus->cpu.clock();
-                                        break;
-                                    case sf::Keyboard::R:
-                                        bus->reset();
-                                        break;
-                                    case sf::Keyboard::I:
-                                        bus->cpu.irq();
-                                        break;
-                                    case sf::Keyboard::N:
-                                        bus->cpu.nmi();
-                                        break;
-                                    case sf::Keyboard::Space:
-                                        bus->ppu.is_emulation_run = not bus->ppu.is_emulation_run;
-                                        break;
-                                    case sf::Keyboard::D:
-                                        window.close();
-                                        break;
-                                    case sf::Keyboard::Up:
-                                        upper_block();
-                                        break;
-                                    case sf::Keyboard::Down:
-                                        lower_block();
-                                        break;
+                                case sf::Keyboard::Left:
+                                    left_block();
+                                    break;
 
-                                    case sf::Keyboard::Left:
-                                        left_block();
-                                        break;
+                                case sf::Keyboard::Right:
+                                    right_block();
+                                    break;
 
-                                    case sf::Keyboard::Right:
-                                        right_block();
-                                        break;
+                                default:
+                                    break;
 
-                                    default:
-                                        break;
+                            }
+                            break;
 
-                                }
-                                break;
-
-                            default:
-                                break;
-                        }
+                        default:
+                            break;
                     }
+                }
+                // Clear screen
+                window.clear();
         
-                    // Clear screen
-                    window.clear();
-            
-                    // Draw the sprite
-                    draw_from_ppu();
-                    frame_texture.update(pixels);
-                    sprite.setTexture(frame_texture);
-                    window.draw(sprite);
-                    //window.draw(ppu_sprite);
-            
-                    // Draw the string
-                    window.draw(text);
-                    update_debug_strings();
+                // Draw the sprite
+                // draw_from_ppu();
+                frame_texture.update(pixels);
+                sprite.setTexture(frame_texture);
+                window.draw(sprite);
 
-                    if (ENABLE_DEBUGGER)
-                        draw_debugger_pane(&window, font);
-            
-                    // Update the window
-                    window.display();
+                // Draw ppu as shader.
+                draw_from_ppu_shader();
+                window.draw(ppu_image_va);
+        
+                // Draw the string
+                window.draw(text);
+                update_debug_strings();
+
+                sf::VertexArray triangle(sf::Triangles, 3);
+
+                if (ENABLE_DEBUGGER)
+                    draw_debugger_pane(&window, font);
+        
+                // Update the window
+                window.display();
+                frame_counter++;
             }
-        }
         return 0;
-    }
+        }
 
 };
 
